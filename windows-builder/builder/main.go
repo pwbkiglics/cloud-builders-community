@@ -1,12 +1,12 @@
 package main
 
 import (
-	"os/signal"
 	"context"
-	"syscall"
 	"flag"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/GoogleCloudPlatform/cloud-builders-community/windows-builder/builder/builder"
 )
@@ -17,6 +17,7 @@ var (
 	password         = flag.String("password", os.Getenv("PASSWORD"), "Password on remote Windows server")
 	command          = flag.String("command", "", "Command to run on remote Windows server")
 	notCopyWorkspace = flag.Bool("not-copy-workspace", false, "If copy workspace or not")
+	resetPassword    = flag.Bool("reset-password", true, "If reset Windows password or not")
 	workspacePath    = flag.String("workspace-path", "/workspace", "The directory to copy data from")
 	workspaceBucket  = flag.String("workspace-bucket", "", "The bucket to copy the directory to. Defaults to {project-id}_cloudbuild")
 	image            = flag.String("image", "windows-cloud/global/images/windows-server-2019-dc-for-containers-v20191210", "Windows image to start the server from")
@@ -69,6 +70,7 @@ func main() {
 			Tags:             tags,
 			UseInternalNet:   useInternalNet,
 			CreateExternalIP: createExternalIP,
+			ResetPassword:    resetPassword,
 		}
 		s = builder.NewServer(ctx, bs)
 		r = &s.Remote

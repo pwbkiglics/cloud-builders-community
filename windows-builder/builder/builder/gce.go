@@ -87,10 +87,13 @@ func NewServer(ctx context.Context, bs *BuilderServer) *Server {
 	}
 
 	// Reset password
-	username := "windows-builder"
-	password, err := s.resetWindowsPassword(username, bs)
-	if err != nil {
-		log.Fatalf("Failed to reset Windows password: %+v", err)
+	var username, password string
+	if *bs.ResetPassword {
+		username = "windows-builder"
+		password, err = s.resetWindowsPassword(username, bs)
+		if err != nil {
+			log.Fatalf("Failed to reset Windows password: %+v", err)
+		}
 	}
 
 	var ip string
@@ -196,8 +199,8 @@ func (s *Server) newInstance(bs *BuilderServer) error {
 		NetworkInterfaces: []*compute.NetworkInterface{
 			&compute.NetworkInterface{
 				AccessConfigs: accessConfigs,
-				Network:    prefix + s.projectID + "/global/networks/" + *bs.VPC,
-				Subnetwork: prefix + s.projectID + "/regions/" + *bs.Region + "/subnetworks/" + *bs.Subnet,
+				Network:       prefix + s.projectID + "/global/networks/" + *bs.VPC,
+				Subnetwork:    prefix + s.projectID + "/regions/" + *bs.Region + "/subnetworks/" + *bs.Subnet,
 			},
 		},
 		ServiceAccounts: []*compute.ServiceAccount{
@@ -212,7 +215,7 @@ func (s *Server) newInstance(bs *BuilderServer) error {
 		Scheduling: &compute.Scheduling{
 			Preemptible: *bs.Preemptible,
 		},
-		Tags: &compute.Tags {
+		Tags: &compute.Tags{
 			Items: bs.GetTags(),
 		},
 	}
@@ -261,7 +264,7 @@ func (s *Server) DeleteInstance(bs *BuilderServer) error {
 }
 
 // getInternalIP gets an internal IP for an instance.
-func(s *Server) getInternalIP(bs *BuilderServer) (string, error) {
+func (s *Server) getInternalIP(bs *BuilderServer) (string, error) {
 	err := s.refreshInstance(bs)
 	if err != nil {
 		log.Printf("Error refreshing instance: %+v", err)
@@ -323,7 +326,7 @@ func (s *Server) setFirewallRule(bs *BuilderServer) error {
 	return nil
 }
 
-//WindowsPasswordConfig stores metadata to be sent to GCE.
+// WindowsPasswordConfig stores metadata to be sent to GCE.
 type WindowsPasswordConfig struct {
 	key      *rsa.PrivateKey
 	password string
@@ -334,7 +337,7 @@ type WindowsPasswordConfig struct {
 	ExpireOn time.Time `json:"expireOn"`
 }
 
-//WindowsPasswordResponse stores data received from GCE.
+// WindowsPasswordResponse stores data received from GCE.
 type WindowsPasswordResponse struct {
 	UserName          string `json:"userName"`
 	PasswordFound     bool   `json:"passwordFound"`
