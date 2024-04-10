@@ -4,6 +4,8 @@ substitutions:
 steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: [ 'build', '-t', '${_REGISTRY}/$PROJECT_ID/${_BUILDER}', '.' ]
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-t', '${_REGISTRY}/$PROJECT_ID/${_BUILDER}:alpine', '-f', 'Dockerfile-alpine', '.' ]
 images:
 - '${_REGISTRY}/$PROJECT_ID/${_BUILDER}'
 tags: ['cloud-builders-community']

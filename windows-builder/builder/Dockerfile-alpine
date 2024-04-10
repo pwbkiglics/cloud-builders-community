@@ -1,0 +1,11 @@
+FROM golang AS build-env
+
+ADD ./ /go/src/builder
+WORKDIR /go/src/builder
+
+RUN GO111MODULE=on CGO_ENABLED=0 go build -o /go/bin/main && strip /go/bin/main
+
+FROM alpine:3.19.1
+RUN apk add git
+COPY --from=build-env /go/bin/main /usr/local/bin/main
+ENTRYPOINT [ "/usr/local/bin/main" ]
