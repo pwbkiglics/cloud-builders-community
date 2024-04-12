@@ -36,10 +36,12 @@ var (
 	tags             = flag.String("tags", "", "List of strings eparated by comma to add when creating the Windows server")
 	useInternalNet   = flag.Bool("use-internal-network", false, "Communicate with Windows server over the internal network")
 	createExternalIP = flag.Bool("create-external-ip", false, "Create an external IP address when using internal network")
+	logLevel         = flag.String("logLevel", "info", "Set log level")
 )
 
 func main() {
-	log.Print("Starting Windows builder")
+	sugar := builder.InitLogger(*logLevel)
+	sugar.Debug("Starting Windows builder")
 	flag.Parse()
 	var r *builder.Remote
 	var s *builder.Server
@@ -52,7 +54,7 @@ func main() {
 			Username: username,
 			Password: password,
 		}
-		log.Printf("Connecting to existing host %s", *r.Hostname)
+		sugar.Infof("Connecting to existing host %s", *r.Hostname)
 	} else {
 		ctx := context.Background()
 		bs = &builder.BuilderServer{
@@ -75,39 +77,39 @@ func main() {
 		s = builder.NewServer(ctx, bs)
 		r = &s.Remote
 
-		log.Print("Setting up termination signal handler")
+		sugar.Info("Setting up termination signal handler")
 		sigsChannel := make(chan os.Signal, 1)
 		signal.Notify(sigsChannel, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 		go func() {
 			sig := <-sigsChannel
-			log.Printf("Signal %+v received, terminating", sig)
+			sugar.Infof("Signal %+v received, terminating", sig)
 			deleteInstanceAndExit(s, bs, 1)
 		}()
 	}
 
-	log.Print("Waiting for server to become available")
+	sugar.Info("Waiting for server to become available")
 	err := r.Wait()
 	if err != nil {
-		log.Printf("Error connecting to server: %+v", err)
+		sugar.Infof("Error connecting to server: %+v", err)
 		deleteInstanceAndExit(s, bs, 1)
 	}
 
 	r.BucketName = workspaceBucket
 	// Copy workspace to remote machine
 	if !*notCopyWorkspace {
-		log.Print("Copying workspace")
+		sugar.Info("Copying workspace")
 		err = r.Copy(*workspacePath, *copyTimeout)
 		if err != nil {
-			log.Printf("Error copying workspace: %+v", err)
+			sugar.Infof("Error copying workspace: %+v", err)
 			deleteInstanceAndExit(s, bs, 1)
 		}
 	}
 
 	// Execute on remote
-	log.Printf("Executing command %s", *command)
+	sugar.Infof("Executing command %s", *command)
 	err = r.Run(*command, *commandTimeout)
 	if err != nil {
-		log.Printf("Error executing command: %+v", err)
+		sugar.Infof("Error executing command: %+v", err)
 		deleteInstanceAndExit(s, bs, 1)
 	}
 
@@ -116,12 +118,13 @@ func main() {
 }
 
 func deleteInstanceAndExit(s *builder.Server, bs *builder.BuilderServer, exitCode int) {
+	sugar := builder.GetLogger()
 	if s != nil {
 		err := s.DeleteInstance(bs)
 		if err != nil {
 			log.Fatalf("Failed to shut down instance: %+v", err)
 		} else {
-			log.Print("Instance shut down successfully")
+			sugar.Info("Instance shut down successfully")
 		}
 	}
 

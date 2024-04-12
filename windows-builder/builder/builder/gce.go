@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os/exec"
 	"strings"
 	"time"
@@ -46,7 +45,7 @@ func getProject() (string, error) {
 		// Use the GCE Metadata service.
 		projectID, err := metadata.ProjectID()
 		if err != nil {
-			log.Printf("Failed to get project ID from instance metadata")
+			sugar.Info("Failed to get project ID from instance metadata")
 			return "", err
 		}
 		return projectID, nil
@@ -57,7 +56,7 @@ func getProject() (string, error) {
 	cmd.Stdout = &out
 	err := cmd.Run()
 	if err != nil {
-		log.Printf("Failed to shell out to gcloud: %+v", err)
+		sugar.Infof("Failed to shell out to gcloud: %+v", err)
 		return "", err
 	}
 	projectID := strings.TrimSuffix(out.String(), "\n")
@@ -69,20 +68,20 @@ func NewServer(ctx context.Context, bs *BuilderServer) *Server {
 	// Get the current project ID.
 	projectID, err := getProject()
 	if err != nil {
-		log.Fatalf("Cannot create new server without project ID: %+v", err)
+		sugar.Fatalf("Cannot create new server without project ID: %+v", err)
 		return nil
 	}
 	s := &Server{projectID: projectID}
 
-	log.Printf("Starting GCE service in project %s", projectID)
+	sugar.Infof("Starting GCE service in project %s", projectID)
 	err = s.newGCEService(ctx)
 	if err != nil {
-		log.Fatalf("Failed to start GCE service: %v", err)
+		sugar.Fatalf("Failed to start GCE service: %v", err)
 		return nil
 	}
 	err = s.newInstance(bs)
 	if err != nil {
-		log.Fatalf("Failed to start Windows VM: %v", err)
+		sugar.Fatalf("Failed to start Windows VM: %v", err)
 		return nil
 	}
 
@@ -92,7 +91,7 @@ func NewServer(ctx context.Context, bs *BuilderServer) *Server {
 		username = "windows-builder"
 		password, err = s.resetWindowsPassword(username, bs)
 		if err != nil {
-			log.Fatalf("Failed to reset Windows password: %+v", err)
+			sugar.Fatalf("Failed to reset Windows password: %+v", err)
 		}
 	}
 
@@ -102,21 +101,21 @@ func NewServer(ctx context.Context, bs *BuilderServer) *Server {
 		// Get internal IP address.
 		ip, err = s.getInternalIP(bs)
 		if err != nil {
-			log.Fatalf("Failed to get internal IP address: %v", err)
+			sugar.Fatalf("Failed to get internal IP address: %v", err)
 			return nil
 		}
 	} else {
 		// Set firewall rule.
 		err = s.setFirewallRule(bs)
 		if err != nil {
-			log.Fatalf("Failed to set ingress firewall rule: %v", err)
+			sugar.Fatalf("Failed to set ingress firewall rule: %v", err)
 		}
-		log.Printf("Set ingress firewall rule successfully")
+		sugar.Info("Set ingress firewall rule successfully")
 
 		// Get IP address.
 		ip, err = s.getExternalIP(bs)
 		if err != nil {
-			log.Fatalf("Failed to get external IP address: %v", err)
+			sugar.Fatalf("Failed to get external IP address: %v", err)
 			return nil
 		}
 	}
@@ -134,12 +133,12 @@ func NewServer(ctx context.Context, bs *BuilderServer) *Server {
 func (s *Server) newGCEService(ctx context.Context) error {
 	client, err := google.DefaultClient(ctx, compute.ComputeScope)
 	if err != nil {
-		log.Printf("Failed to create Google Default Client: %v", err)
+		sugar.Infof("Failed to create Google Default Client: %v", err)
 		return err
 	}
 	service, err := compute.New(client)
 	if err != nil {
-		log.Printf("Failed to create Compute Service: %v", err)
+		sugar.Infof("Failed to create Compute Service: %v", err)
 		return err
 	}
 
@@ -222,22 +221,22 @@ func (s *Server) newInstance(bs *BuilderServer) error {
 
 	op, err := s.service.Instances.Insert(s.projectID, *bs.Zone, instance).Do()
 	if err != nil {
-		log.Printf("GCE Instances insert call failed: %v", err)
+		sugar.Infof("GCE Instances insert call failed: %v", err)
 		return err
 	}
 	err = s.waitForComputeOperation(op, bs)
 	if err != nil {
-		log.Printf("Wait for instance start failed: %v", err)
+		sugar.Infof("Wait for instance start failed: %v", err)
 		return err
 	}
 
 	etag := op.Header.Get("Etag")
 	inst, err := s.service.Instances.Get(s.projectID, *bs.Zone, name).IfNoneMatch(etag).Do()
 	if err != nil {
-		log.Printf("Could not get GCE Instance details after creation: %v", err)
+		sugar.Infof("Could not get GCE Instance details after creation: %v", err)
 		return err
 	}
-	log.Printf("Successfully created instance: %s", inst.Name)
+	sugar.Infof("Successfully created instance: %s", inst.Name)
 	s.instance = inst
 	return nil
 }
@@ -246,7 +245,7 @@ func (s *Server) newInstance(bs *BuilderServer) error {
 func (s *Server) refreshInstance(bs *BuilderServer) error {
 	inst, err := s.service.Instances.Get(s.projectID, *bs.Zone, s.instance.Name).Do()
 	if err != nil {
-		log.Printf("Could not refresh instance: %v", err)
+		sugar.Infof("Could not refresh instance: %v", err)
 		return err
 	}
 	s.instance = inst
@@ -257,7 +256,7 @@ func (s *Server) refreshInstance(bs *BuilderServer) error {
 func (s *Server) DeleteInstance(bs *BuilderServer) error {
 	_, err := s.service.Instances.Delete(s.projectID, *bs.Zone, s.instance.Name).Do()
 	if err != nil {
-		log.Printf("Could not delete instance: %v", err)
+		sugar.Infof("Could not delete instance: %v", err)
 		return err
 	}
 	return nil
@@ -267,7 +266,7 @@ func (s *Server) DeleteInstance(bs *BuilderServer) error {
 func (s *Server) getInternalIP(bs *BuilderServer) (string, error) {
 	err := s.refreshInstance(bs)
 	if err != nil {
-		log.Printf("Error refreshing instance: %+v", err)
+		sugar.Infof("Error refreshing instance: %+v", err)
 	}
 	internalIP := s.instance.NetworkInterfaces[0].NetworkIP
 	if internalIP == "" {
@@ -280,7 +279,7 @@ func (s *Server) getInternalIP(bs *BuilderServer) (string, error) {
 func (s *Server) getExternalIP(bs *BuilderServer) (string, error) {
 	err := s.refreshInstance(bs)
 	if err != nil {
-		log.Printf("Error refreshing instance: %+v", err)
+		sugar.Infof("Error refreshing instance: %+v", err)
 	}
 	for _, ni := range s.instance.NetworkInterfaces {
 		for _, ac := range ni.AccessConfigs {
@@ -296,12 +295,12 @@ func (s *Server) getExternalIP(bs *BuilderServer) (string, error) {
 func (s *Server) setFirewallRule(bs *BuilderServer) error {
 	list, err := s.service.Firewalls.List(s.projectID).Do()
 	if err != nil {
-		log.Printf("Could not list GCE firewalls: %+v", err)
+		sugar.Infof("Could not list GCE firewalls: %+v", err)
 		return err
 	}
 	for _, f := range list.Items {
 		if f.Name == "allow-winrm-ingress" {
-			log.Print("Firewall rule already exists")
+			sugar.Info("Firewall rule already exists")
 			return nil
 		}
 	}
@@ -320,7 +319,7 @@ func (s *Server) setFirewallRule(bs *BuilderServer) error {
 	}
 	_, err = s.service.Firewalls.Insert(s.projectID, firewallRule).Do()
 	if err != nil {
-		log.Printf("Error setting firewall rule: %v", err)
+		sugar.Infof("Error setting firewall rule: %v", err)
 		return err
 	}
 	return nil
@@ -353,7 +352,7 @@ func (s *Server) resetWindowsPassword(username string, bs *BuilderServer) (strin
 	//Create random key and encode
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		log.Printf("Failed to generate random RSA key: %v", err)
+		sugar.Infof("Failed to generate random RSA key: %v", err)
 		return "", err
 	}
 	buf := make([]byte, 4)
@@ -369,12 +368,12 @@ func (s *Server) resetWindowsPassword(username string, bs *BuilderServer) (strin
 	data, err := json.Marshal(wpc)
 	dstring := string(data)
 	if err != nil {
-		log.Printf("Failed to marshal JSON: %v", err)
+		sugar.Infof("Failed to marshal JSON: %v", err)
 		return "", err
 	}
 
 	//Write key to instance metadata and wait for op to complete
-	log.Print("Writing Windows instance metadata for password reset")
+	sugar.Info("Writing Windows instance metadata for password reset")
 	s.instance.Metadata.Items = append(s.instance.Metadata.Items, &compute.MetadataItems{
 		Key:   "windows-keys",
 		Value: &dstring,
@@ -384,23 +383,23 @@ func (s *Server) resetWindowsPassword(username string, bs *BuilderServer) (strin
 		Items:       s.instance.Metadata.Items,
 	}).Do()
 	if err != nil {
-		log.Printf("Failed to set instance metadata: %v", err)
+		sugar.Infof("Failed to set instance metadata: %v", err)
 		return "", err
 	}
 	err = s.waitForComputeOperation(op, bs)
 	if err != nil {
-		log.Printf("Compute operation timed out")
+		sugar.Infof("Compute operation timed out")
 		return "", err
 	}
 
 	//Read and decode password
-	log.Print("Waiting for Windows password response")
+	sugar.Info("Waiting for Windows password response")
 	timeout := time.Now().Add(time.Minute * 5)
 	hash := sha1.New()
 	for time.Now().Before(timeout) {
 		output, err := s.service.Instances.GetSerialPortOutput(s.projectID, *bs.Zone, s.instance.Name).Port(4).Do()
 		if err != nil {
-			log.Printf("Unable to get serial port output: %v", err)
+			sugar.Infof("Unable to get serial port output: %v", err)
 			return "", err
 		}
 		responses := strings.Split(output.Contents, "\n")
@@ -412,12 +411,12 @@ func (s *Server) resetWindowsPassword(username string, bs *BuilderServer) (strin
 			if wpr.Modulus == wpc.Modulus {
 				decodedPassword, err := base64.StdEncoding.DecodeString(wpr.EncryptedPassword)
 				if err != nil {
-					log.Printf("Cannot Base64 decode password: %v", err)
+					sugar.Infof("Cannot Base64 decode password: %v", err)
 					return "", err
 				}
 				password, err := rsa.DecryptOAEP(hash, rand.Reader, wpc.key, decodedPassword, nil)
 				if err != nil {
-					log.Printf("Cannot decrypt password response: %v", err)
+					sugar.Infof("Cannot decrypt password response: %v", err)
 					return "", err
 				}
 				return string(password), nil
@@ -431,12 +430,12 @@ func (s *Server) resetWindowsPassword(username string, bs *BuilderServer) (strin
 
 // waitForComputeOperation waits for a compute operation
 func (s *Server) waitForComputeOperation(op *compute.Operation, bs *BuilderServer) error {
-	log.Printf("Waiting for %+v to complete", op.Name)
+	sugar.Infof("Waiting for %+v to complete", op.Name)
 	timeout := time.Now().Add(300 * time.Second)
 	for time.Now().Before(timeout) {
 		newop, err := s.service.ZoneOperations.Get(s.projectID, *bs.Zone, op.Name).Do()
 		if err != nil {
-			log.Printf("Failed to update operation status: %v", err)
+			sugar.Infof("Failed to update operation status: %v", err)
 			return err
 		}
 		if newop.Status == "DONE" {

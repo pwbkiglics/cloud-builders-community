@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -81,7 +80,7 @@ func createZip(ctx context.Context, fullpath string) (string, error) {
 		}
 
 		if fi.Mode()&os.ModeSymlink != 0 {
-			log.Printf("Skipping symlink: %q", path)
+			sugar.Infof("Skipping symlink: %q", path)
 			return ctx.Err()
 		}
 

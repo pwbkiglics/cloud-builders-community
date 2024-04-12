@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -81,7 +80,7 @@ func (r *Remote) Copy(inputPath string, copyTimeoutMin int) error {
 		MaxOperationsPerShell: 15,
 	})
 	if err != nil {
-		log.Printf("Error creating connection to remote for copy: %+v", err)
+		sugar.Infof("Error creating connection to remote for copy: %+v", err)
 		return err
 	}
 
@@ -95,15 +94,15 @@ func (r *Remote) Copy(inputPath string, copyTimeoutMin int) error {
 	)
 	if err == nil {
 		// Successfully copied via GCE bucket
-		log.Printf("Successfully copied data via GCE bucket")
+		sugar.Infof("Successfully copied data via GCE bucket")
 		return nil
 	}
 
-	log.Printf("Failed to copy data via GCE bucket: %v", err)
+	sugar.Infof("Failed to copy data via GCE bucket: %v", err)
 
 	err = c.Copy(inputPath, `C:\workspace`)
 	if err != nil {
-		log.Printf("Error copying workspace to remote: %+v", err)
+		sugar.Infof("Error copying workspace to remote: %+v", err)
 		return err
 	}
 
@@ -206,13 +205,13 @@ func (bs *BuilderServer) GetLabelsMap() map[string]string {
 	for _, label := range strings.Split(*bs.Labels, ",") {
 		labelSpl := strings.Split(label, "=")
 		if len(labelSpl) != 2 {
-			log.Printf("Error: Label needs to be key=value template. %s label ignored", label)
+			sugar.Infof("Error: Label needs to be key=value template. %s label ignored", label)
 			continue
 		}
 
 		var key = strings.TrimSpace(labelSpl[0])
 		if len(key) == 0 {
-			log.Printf("Error: Label key can't be empty. %s label ignored", label)
+			sugar.Infof("Error: Label key can't be empty. %s label ignored", label)
 			continue
 		}
 		var value = strings.TrimSpace(labelSpl[1])
