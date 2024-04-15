@@ -53,6 +53,7 @@ func (r *Remote) Wait() error {
 		if err == nil {
 			return nil
 		}
+		sugar.Debugf("error running 'ver' on remote: %s\n", err)
 		time.Sleep(10 * time.Second)
 	}
 	return errors.New("Timed out waiting for server to be available")

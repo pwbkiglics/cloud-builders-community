@@ -35,11 +35,13 @@ func getLogLevelFromString(level string) zapcore.Level {
 func InitLogger(logLevel string) *zap.SugaredLogger {
 	cfg := zap.NewProductionConfig()
 	cfg.Level.SetLevel(getLogLevelFromString(logLevel))
+	cfg.Encoding = "console"
 	logger, err := cfg.Build()
 	if err != nil {
 		log.Fatalf("error initializing zap: %s\n", err)
 	}
 
 	sugar = logger.Sugar()
+	sugar.Infof("Log level is set to: %s (%d)", logLevel, cfg.Level.Level())
 	return sugar
 }
